@@ -54,11 +54,11 @@
 
     Front End Macros: (use these)
         #define new_str_dict(cap, type) ... // return a Str_Dict
-        #define free_str_dict(dict)     ... // free it
+        #define free_str_dict(p_dict)   ... // free it
 
-        #define str_dict_insert(pmap, key, pelem) ... // insert into it
-        #define str_dict_find(dict, key)          ... // get stuff back out
-        #define str_dict_delete(dict, key)        ... // get stuff back out
+        #define str_dict_insert(p_dict, key, p_value) ... // insert into it
+        #define str_dict_find(p_dict, key)            ... // get stuff back out
+        #define str_dict_delete(p_dict, key)          ... // get stuff back out
 
     Struct Declaration:
         typedef struct Str_Dict {
@@ -421,11 +421,11 @@ inline static void* fn_str_dict_delete(Str_Dict *dict, const char* key) {
 
                         /* Frontend Macros */
 #define new_str_dict(cap, type) fn_new_str_dict(cap, sizeof(type))
-#define free_str_dict(dict) fn_free_str_dict(dict)
+#define free_str_dict(p_dict) fn_free_str_dict(p_dict)
 
-#define str_dict_insert(pmap, key, pelem) fn_str_dict_insert(pmap, key, pelem, sizeof(*pelem))
-#define str_dict_find(dict, key) fn_str_dict_find(dict, key)
-#define str_dict_delete(dict, key) fn_str_dict_delete(dict, key)
+#define str_dict_insert(p_dict, key, p_value) fn_str_dict_insert(p_dict, key, p_value, sizeof(*p_value))
+#define str_dict_find(p_dict, key) fn_str_dict_find(p_dict, key)
+#define str_dict_delete(p_dict, key) fn_str_dict_delete(p_dict, key)
 
                     /* BEGIN STR DICT IMPLEMENTATION */
 #ifdef SOL_STR_DICT_IMPLEMENTATION

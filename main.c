@@ -1,11 +1,11 @@
-#define SOL_STR_DICT_IMPLEMENTATION
-#include "str_dict.h"
+#define SOL_HASH_MAP_IMPLEMENTATION
+#include "hash_map.h"
 
 typedef struct Thing {int x,y;} Thing;
 
 int main() {
     int cap = 16;
-    Str_Dict dict = new_str_dict(cap, Thing);
+    Hash_Map map = new_hash_map(cap, Thing);
 
     char buf[2];
     Thing thing;
@@ -13,14 +13,14 @@ int main() {
         buf[0] = i;
         buf[1] = '\0';
         thing = (struct Thing){i, i};
-        assert(str_dict_insert(&dict, buf, &thing) && "Insertion Failed");
+        assert(hash_map_insert_str(&map, buf, &thing) && "Insertion Failed");
     }
 
     Thing *pthing;
     for(int i = 1; i < 255; ++i) {
         buf[0] = i;
         buf[1] = '\0';
-        pthing = str_dict_find(&dict, buf);
+        pthing = hash_map_find_str(&map, buf);
 
         assert(pthing && "Find Failed");
 
@@ -33,7 +33,7 @@ int main() {
     for(int i = 1; i < 255; ++i) {
         buf[0] = i;
         buf[1] = '\0';
-        pthing = str_dict_delete(&dict, buf);
+        pthing = hash_map_delete_str(&map, buf);
 
         assert(pthing && "Find Failed");
 
@@ -42,10 +42,10 @@ int main() {
 
         printf("thing.x = %i, thing.y = %i\n", pthing->x, pthing->y);
 
-        pthing = str_dict_find(&dict, buf);
+        pthing = hash_map_find_str(&map, buf);
         assert(!pthing && "Delete Failed");
     }
 
-    free_str_dict(&dict);
+    free_hash_map(&map);
     return 0;
 }

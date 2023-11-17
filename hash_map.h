@@ -41,50 +41,50 @@
     @Note Deletion does not clear the actual data or hash, just the bit representation (see file notes).
 
     Example usage:
-        Str_Dict dict = new_str_dict(16, Thing);
+        Hash_Map map = new_hash_map(16, Thing);
 
         Thing  thing   = {.x = 0, .y = 5};
-        bool   success = str_dict_insert(&dict, "thing1", &thing); // return true
-        Thing *p_thing = str_dict_find(&dict, "thing1"); // return non-null pointer
+        bool   success = hash_map_insert(&map, "thing1", &thing); // return true
+        Thing *p_thing = hash_map_find(&map, "thing1"); // return non-null pointer
 
-        p_thing = str_dict_delete(&dict, "thing1"); // return non-null pointer
-        p_thing = str_dict_find(&dict, "thing1"); // return null pointer
+        p_thing = hash_map_delete(&map, "thing1"); // return non-null pointer
+        p_thing = hash_map_find(&map, "thing1"); // return null pointer
 
-        free_str_dict(&dict); // return void
+        free_hash_map(&map); // return void
 
     Front End Macros: (use these)
-        #define new_str_dict(cap, type) ... // return a Str_Dict
-        #define free_str_dict(p_dict)   ... // free it
+        #define new_hash_map(cap, type) ... // return a Hash_Map
+        #define free_hash_map(p_map)   ... // free it
 
-        #define str_dict_insert(p_dict, key, p_value) ... // insert into it
-        #define str_dict_find(p_dict, key)            ... // get stuff back out
-        #define str_dict_delete(p_dict, key)          ... // get stuff back out
+        #define hash_map_insert(p_map, key, p_value) ... // insert into it
+        #define hash_map_find(p_map, key)            ... // get stuff back out
+        #define hash_map_delete(p_map, key)          ... // get stuff back out
 
     Struct Declaration:
-        typedef struct Str_Dict {
+        typedef struct Hash_Map {
             int cap;
             int remaining;
             int kv_stride;
             u8 *data;
-        } Str_Dict;
+        } Hash_Map;
 
     Front End Functions:
-        inline static Str_Dict fn_new_str_dict(int cap, int elem_width) {..}
-        inline static void fn_free_str_dict(Str_Dict *dict) {..}
+        inline static Hash_Map fn_new_hash_map(int cap, int elem_width) {..}
+        inline static void fn_free_hash_map(Hash_Map *map) {..}
 
-        inline static bool  fn_str_dict_insert(Str_Dict *dict, const char *key, void *elem, int elem_width) {..}
-        inline static void* fn_str_dict_find(Str_Dict *dict, const char* key) {..}
-        inline static void* fn_str_dict_delete(Str_Dict *dict, u64 hash) {..}
+        inline static bool  fn_hash_map_insert(Hash_Map *map, const char *key, void *elem, int elem_width) {..}
+        inline static void* fn_hash_map_find(Hash_Map *map, const char* key) {..}
+        inline static void* fn_hash_map_delete(Hash_Map *map, u64 hash) {..}
 
     Back End Functions:
-        bool  fn_str_dict_insert_hash(Str_Dict *dict, u64 hash, void *elem, int elem_width);
-        void  fn_str_dict_if_full(Str_Dict *dict, int elem_width);
-        void* fn_str_dict_find_hash(Str_Dict *dict, u64 hash);
-        void* fn_str_dict_delete_hash(Str_Dict *dict, u64 hash);
+        bool  fn_hash_map_insert_hash(Hash_Map *map, u64 hash, void *elem, int elem_width);
+        void  fn_hash_map_if_full(Hash_Map *map, int elem_width);
+        void* fn_hash_map_find_hash(Hash_Map *map, u64 hash);
+        void* fn_hash_map_delete_hash(Hash_Map *map, u64 hash);
 
 */
-#ifndef SOL_STR_DICT_HPP_INCLUDE_GUARD_
-#define SOL_STR_DICT_HPP_INCLUDE_GUARD_
+#ifndef SOL_HASH_MAP_HPP_INCLUDE_GUARD_
+#define SOL_HASH_MAP_HPP_INCLUDE_GUARD_
 
 #include <stdlib.h>
 #include <assert.h>
@@ -368,75 +368,99 @@ OTHER DEALINGS IN THE SOFTWARE.
 For more information, please refer to <http://unlicense.org/>
 */
 
-                        /* BEGIN STR DICT HEADER */
-typedef struct Str_Dict {
+                        /* BEGIN HASH MAP HEADER */
+typedef struct Hash_Map {
     int cap;
     int remaining;
     int kv_stride;
     u8 *data;
-} Str_Dict;
+} Hash_Map;
 
-#define STR_DICT_FULL        0b01111111
-#define STR_DICT_EMPTY       0b11111111
-#define STR_DICT_DELETED     0b10000000
-#define STR_DICT_GROUP_WIDTH 16
+#define HASH_MAP_FULL        0b01111111
+#define HASH_MAP_EMPTY       0b11111111
+#define HASH_MAP_DELETED     0b10000000
+#define HASH_MAP_GROUP_WIDTH 16
 
                         /* Backend Functions*/
-bool  fn_str_dict_insert_hash(Str_Dict *dict, u64 hash, void *elem, int elem_width);
-void  fn_str_dict_if_full(Str_Dict *dict, int elem_width);
-void* fn_str_dict_find_hash(Str_Dict *dict, u64 hash);
-void* fn_str_dict_delete_hash(Str_Dict *dict, u64 hash);
+bool  fn_hash_map_insert_hash(Hash_Map *map, u64 hash, void *elem, int elem_width);
+void  fn_hash_map_if_full(Hash_Map *map, int elem_width);
+void* fn_hash_map_find_hash(Hash_Map *map, u64 hash);
+void* fn_hash_map_delete_hash(Hash_Map *map, u64 hash);
 
                         /* Frontend Functions */
-inline static Str_Dict fn_new_str_dict(int cap, int elem_width) {
-    Str_Dict ret  = {};
+inline static u64 get_hash(int byte_len, void *bytes) {
+    return wyhash(bytes, byte_len, 0, _wyp);
+}
+
+inline static Hash_Map fn_new_hash_map(int cap, int elem_width) {
+    Hash_Map ret  = {};
     ret.cap       = align(cap, 16);
     ret.remaining = ((cap + 1) / 8) * 7;
     ret.kv_stride = align(8 + elem_width, 16);
     ret.data      = malloc(ret.cap + ret.cap * ret.kv_stride);
-    memset(ret.data, STR_DICT_EMPTY, ret.cap);
+    memset(ret.data, HASH_MAP_EMPTY, ret.cap);
     return ret;
 }
-
-inline static void fn_free_str_dict(Str_Dict *dict) {
-    free(dict->data);
+ static void fn_free_hash_map(Hash_Map *map) {
+    free(map->data);
 }
 
-inline static bool fn_str_dict_insert(Str_Dict *dict, const char *key, void *elem, int elem_width) {
-    if (dict->remaining == 0)
-        fn_str_dict_if_full(dict, elem_width);
+inline static bool fn_hash_map_insert(Hash_Map *map, int byte_len, void *key, void *elem, int elem_width) {
+    if (map->remaining == 0)
+        fn_hash_map_if_full(map, elem_width);
+
+    u64 hash = wyhash(key, byte_len, 0, _wyp);
+    return fn_hash_map_insert_hash(map, hash, elem, elem_width);
+}
+inline static bool fn_hash_map_insert_str(Hash_Map *map, const char *key, void *elem, int elem_width) {
+    if (map->remaining == 0)
+        fn_hash_map_if_full(map, elem_width);
 
     u64 hash = wyhash(key, strlen(key), 0, _wyp);
-    return fn_str_dict_insert_hash(dict, hash, elem, elem_width);
+    return fn_hash_map_insert_hash(map, hash, elem, elem_width);
 }
 
-inline static void* fn_str_dict_find(Str_Dict *dict, const char* key) {
-    u64 hash = wyhash(key, strlen(key), 0, _wyp);
-    return fn_str_dict_find_hash(dict, hash);
+inline static void* fn_hash_map_find(Hash_Map *map, int byte_len, void *bytes) {
+    u64 hash = wyhash(bytes, byte_len, 0, _wyp);
+    return fn_hash_map_find_hash(map, hash);
 }
-inline static void* fn_str_dict_delete(Str_Dict *dict, const char* key) {
+inline static void* fn_hash_map_find_str(Hash_Map *map, const char* key) {
     u64 hash = wyhash(key, strlen(key), 0, _wyp);
-    return fn_str_dict_delete_hash(dict, hash);
+    return fn_hash_map_find_hash(map, hash);
+}
+
+inline static void* fn_hash_map_delete(Hash_Map *map, int byte_len, void *bytes) {
+    u64 hash = wyhash(bytes, byte_len, 0, _wyp);
+    return fn_hash_map_delete_hash(map, hash);
+}
+inline static void* fn_hash_map_delete_str(Hash_Map *map, const char* key) {
+    u64 hash = wyhash(key, strlen(key), 0, _wyp);
+    return fn_hash_map_delete_hash(map, hash);
 }
 
                         /* Frontend Macros */
-#define new_str_dict(cap, type) fn_new_str_dict(cap, sizeof(type))
-#define free_str_dict(p_dict) fn_free_str_dict(p_dict)
+#define new_hash_map(cap, type) fn_new_hash_map(cap, sizeof(type))
+#define free_hash_map(p_map) fn_free_hash_map(p_map)
 
-#define str_dict_insert(p_dict, key, p_value) fn_str_dict_insert(p_dict, key, p_value, sizeof(*p_value))
-#define str_dict_find(p_dict, key) fn_str_dict_find(p_dict, key)
-#define str_dict_delete(p_dict, key) fn_str_dict_delete(p_dict, key)
+#define hash_map_insert(p_map, p_key, p_value) fn_hash_map_insert(p_map, sizeof(*p_key), p_key, p_value, sizeof(*p_value))
+#define hash_map_insert_str(p_map, str_key, p_value) fn_hash_map_insert_str(p_map, str_key, p_value, sizeof(*p_value))
 
-                    /* BEGIN STR DICT IMPLEMENTATION */
-#ifdef SOL_STR_DICT_IMPLEMENTATION
+#define hash_map_find(p_map, p_key) fn_hash_map_find_hash(p_map, sizeof(*key), p_key)
+#define hash_map_find_str(p_map, str_key) fn_hash_map_find_str(p_map, str_key)
 
-bool fn_str_dict_insert_hash(Str_Dict *dict, u64 hash, void *elem, int elem_width) {
-    int g_idx = (hash & (dict->cap - 1));
+#define hash_map_delete(p_map, p_key) fn_hash_map_delete(p_map, sizeof(*key), p_key)
+#define hash_map_delete_str(p_map, str_key) fn_hash_map_delete_str(p_map, str_key)
+
+                    /* BEGIN HASH MAP IMPLEMENTATION */
+#ifdef SOL_HASH_MAP_IMPLEMENTATION
+
+bool fn_hash_map_insert_hash(Hash_Map *map, u64 hash, void *elem, int elem_width) {
+    int g_idx = (hash & (map->cap - 1));
     g_idx    -= g_idx & 15;
 
-    u8  *data   = dict->data;
-    int  cap    = dict->cap;
-    int  stride = dict->kv_stride;
+    u8  *data   = map->data;
+    int  cap    = map->cap;
+    int  stride = map->kv_stride;
 
     int  tz;
     u16  mask;
@@ -456,32 +480,32 @@ bool fn_str_dict_insert_hash(Str_Dict *dict, u64 hash, void *elem, int elem_widt
         } else {
             tz = count_trailing_zeros_u16(mask);
 
-            u8 top7 = (hash >> 57) & STR_DICT_FULL;
+            u8 top7 = (hash >> 57) & HASH_MAP_FULL;
             data[g_idx + tz] = 0x0 | top7;
 
             phash  = (u64*)(data + cap + (stride * (tz + g_idx)));
            *phash  =  hash;
             memcpy(data + cap + (stride * (tz + g_idx)) + 8, elem, elem_width);
 
-            dict->remaining -= 1;
+            map->remaining -= 1;
             return true;
         }
     }
     return false;
 }
-void fn_str_dict_if_full(Str_Dict *dict, int elem_width) {
-    assert(dict->cap * 2 > dict->cap && "mul overflow");
+void fn_hash_map_if_full(Hash_Map *map, int elem_width) {
+    assert(map->cap * 2 > map->cap && "mul overflow");
 
-    u8 *old_data = dict->data;
-    int old_cap  = dict->cap;
+    u8 *old_data = map->data;
+    int old_cap  = map->cap;
 
-    dict->cap      *= 2;
-    dict->data      = malloc(dict->cap + dict->cap * dict->kv_stride);
-    dict->remaining = ((dict->cap + 1) / 8) * 7;
+    map->cap      *= 2;
+    map->data      = malloc(map->cap + map->cap * map->kv_stride);
+    map->remaining = ((map->cap + 1) / 8) * 7;
 
-    memset(dict->data, STR_DICT_EMPTY, dict->cap);
+    memset(map->data, HASH_MAP_EMPTY, map->cap);
 
-    int stride = dict->kv_stride;
+    int stride = map->kv_stride;
 
     int  pc;
     int  tz;
@@ -499,19 +523,19 @@ void fn_str_dict_if_full(Str_Dict *dict, int elem_width) {
             mask ^= 1 << tz;
 
             phash = (u64*)(old_data + old_cap + (stride * (tz + i)));
-            assert(fn_str_dict_insert_hash(dict, *phash, (u8*)phash + 8, elem_width) && "dict grow failure");
+            assert(fn_hash_map_insert_hash(map, *phash, (u8*)phash + 8, elem_width) && "hash map grow failure");
         }
     }
     free(old_data);
 }
-void* fn_str_dict_find_hash(Str_Dict *dict, u64 hash) {
-    u8 top7   = (hash >> 57) & STR_DICT_FULL;
-    int g_idx = hash & (dict->cap - 1);
+void* fn_hash_map_find_hash(Hash_Map *map, u64 hash) {
+    u8 top7   = (hash >> 57) & HASH_MAP_FULL;
+    int g_idx = hash & (map->cap - 1);
     g_idx -= g_idx & 15;
 
-    u8 *data   = dict->data;
-    int stride = dict->kv_stride;
-    int cap    = dict->cap;
+    u8 *data   = map->data;
+    int stride = map->kv_stride;
+    int cap    = map->cap;
 
     int  pc;
     int  tz;
@@ -542,17 +566,17 @@ void* fn_str_dict_find_hash(Str_Dict *dict, u64 hash) {
     }
     return NULL;
 }
-void* fn_str_dict_delete_hash(Str_Dict *dict, u64 hash) {
-    u8 top7   = (hash >> 57) & STR_DICT_FULL;
-    int g_idx = hash & (dict->cap - 1);
+void* fn_hash_map_delete_hash(Hash_Map *map, u64 hash) {
+    u8 top7   = (hash >> 57) & HASH_MAP_FULL;
+    int g_idx = hash & (map->cap - 1);
     g_idx    -= g_idx & 15;
 
     __m128i a;
     __m128i b = _mm_set1_epi8(top7);
 
-    u8 *data   = dict->data;
-    int stride = dict->kv_stride;
-    int cap    = dict->cap;
+    u8 *data   = map->data;
+    int stride = map->kv_stride;
+    int cap    = map->cap;
 
     int  pc;
     int  tz;
@@ -572,7 +596,7 @@ void* fn_str_dict_delete_hash(Str_Dict *dict, u64 hash) {
             mask ^= 1 << tz;
             phash = (u64*)(data + cap + (stride * (tz + g_idx)));
             if (*phash == hash) {
-                data[g_idx + tz] = STR_DICT_DELETED;
+                data[g_idx + tz] = HASH_MAP_DELETED;
                 return (u8*)phash + 8;
             }
         }
